@@ -88,7 +88,7 @@ TEST_F(MoneyUtilsTest, ValidateOutOfBound) {
   money.set_units(-1);
   money.set_nanos(-1000000000);
   EXPECT_ERROR_CODE(StatusCode::kInvalidArgument, ValidateMoney(money));
-  money.set_nanos(-INT32_MIN);
+  money.set_nanos(INT32_MIN);
   EXPECT_ERROR_CODE(StatusCode::kInvalidArgument, ValidateMoney(money));
 }
 
