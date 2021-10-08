@@ -19,7 +19,6 @@ limitations under the License.
 #include "google/protobuf/stubs/logging.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/message_differencer.h"
-#include "google/type/money.pb.h"
 #include "gtest/gtest.h"
 #include "utils/status_test_util.h"
 

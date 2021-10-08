@@ -17,14 +17,12 @@ limitations under the License.
 #include "utils/md5.h"
 
 #include "google/protobuf/text_format.h"
-#include "google/type/money.pb.h"
 #include "gtest/gtest.h"
 
 using std::string;
 using ::google::api::servicecontrol::v1::CheckRequest;
 using ::google::api::servicecontrol::v1::MetricValue;
 using ::google::api::servicecontrol::v1::Operation;
-using ::google::type::Money;
 using ::google::protobuf::TextFormat;
 
 namespace google {

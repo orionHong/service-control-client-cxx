@@ -17,7 +17,6 @@ limitations under the License.
 
 #include <iostream>
 
-#include "src/money_utils.h"
 #include "src/signature.h"
 #include "utils/distribution_helper.h"
 #include "utils/stl_util.h"

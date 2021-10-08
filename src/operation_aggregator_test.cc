@@ -19,7 +19,6 @@ limitations under the License.
 #include "google/protobuf/stubs/logging.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/message_differencer.h"
-#include "google/type/money.pb.h"
 #include "gtest/gtest.h"
 
 using std::string;
@@ -27,7 +26,6 @@ using ::google::api::MetricDescriptor;
 using ::google::api::servicecontrol::v1::Distribution;
 using ::google::api::servicecontrol::v1::MetricValue;
 using ::google::api::servicecontrol::v1::Operation;
-using ::google::type::Money;
 using ::google::protobuf::TextFormat;
 using ::google::protobuf::util::MessageDifferencer;
 
@@ -344,13 +342,6 @@ class OperationAggregatorTest : public ::testing::Test {
     *(operation->mutable_metric_value_sets(0)
           ->mutable_metric_values(0)
           ->mutable_distribution_value()) = value;
-  }
-
-  Money CreateMoney(const string& currency_code, int value) {
-    Money money;
-    money.set_currency_code(currency_code);
-    money.set_units(value);
-    return money;
   }
 
   Operation operation1_;

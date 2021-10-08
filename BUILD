@@ -19,8 +19,6 @@ cc_library(
         "src/cache_removed_items_handler.h",
         "src/check_aggregator_impl.cc",
         "src/check_aggregator_impl.h",
-        "src/money_utils.cc",
-        "src/money_utils.h",
         "src/operation_aggregator.cc",
         "src/operation_aggregator.h",
         "src/quota_aggregator_impl.cc",
@@ -58,7 +56,6 @@ cc_library(
         "@boringssl//:crypto",
         "@googleapis_git//google/api:metric_cc_proto",
         "@googleapis_git//google/api/servicecontrol/v1:servicecontrol_cc_proto",
-        "@googleapis_git//google/type:money_cc_proto",
     ],
 )
 
@@ -117,18 +114,6 @@ cc_test(
     name = "md5_test",
     size = "small",
     srcs = ["utils/md5_test.cc"],
-    deps = [
-        ":service_control_client_lib",
-        "@googletest_git//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "money_utils_test",
-    size = "small",
-    srcs = [
-        "src/money_utils_test.cc",
-    ],
     deps = [
         ":service_control_client_lib",
         "@googletest_git//:gtest_main",
