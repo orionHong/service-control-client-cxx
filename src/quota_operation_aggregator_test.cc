@@ -29,8 +29,6 @@ using std::string;
 using ::google::api::servicecontrol::v1::QuotaOperation;
 using ::google::protobuf::TextFormat;
 using ::google::protobuf::util::MessageDifferencer;
-using ::google::protobuf::util::Status;
-using ::google::protobuf::util::StatusCode;
 
 namespace google {
 namespace service_control_client {
