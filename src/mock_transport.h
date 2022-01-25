@@ -101,6 +101,7 @@ class MockCheckTransport {
     check_request_ = request;
     Status done_status = done_status_;
     CheckResponse* check_response = check_response_;
+    MutexLock lock(callback_threads_mutex_);
     callback_threads_.push_back(std::unique_ptr<Thread>(
         new Thread([on_done, done_status, check_response, response]() {
           if (check_response) {
@@ -120,6 +121,8 @@ class MockCheckTransport {
   std::vector<TransportDoneFunc> on_done_vector_;
   // The status to send in on_done call back for Check() or Report().
   Status done_status_;
+  // A mutex to protect callback_threads_
+  Mutex callback_threads_mutex_;
   // A vector to store thread objects used to call on_done callback.
   std::vector<std::unique_ptr<std::thread>> callback_threads_;
 };
