@@ -50,7 +50,7 @@ allocate_operation {
       int64_value: 1
     }
   }
-  quota_mode: BEST_EFFORT
+  quota_mode: NORMAL
 }
 service_config_id: "2016-09-19r0"
 )";
@@ -73,7 +73,7 @@ allocate_operation {
       int64_value: 3
     }
   }
-  quota_mode: BEST_EFFORT
+  quota_mode: NORMAL
 }
 service_config_id: "2016-09-19r0"
 )";
@@ -96,7 +96,7 @@ allocate_operation {
       int64_value: 1
     }
   }
-  quota_mode: BEST_EFFORT
+  quota_mode: NORMAL
 }
 service_config_id: "2016-09-19r0"
 )";
@@ -659,6 +659,49 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegative) {
             QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_BEST_EFFORT);
   EXPECT_EQ(flushed_[1].allocate_operation().quota_mode(),
             QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_CHECK_ONLY);
+
+  // Set CHECK_ONLY call response as positive.
+  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+
+  // Next call should be positive
+  EXPECT_OK(aggregator_->Quota(request1_, &response));
+  // Get the cached response.
+  EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
+
+}
+
+TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegativeBestEffort) {
+  AllocateQuotaResponse response;
+
+  // trigger initial allocation
+  EXPECT_OK(aggregator_->Quota(request1_, &response));
+  // quota_call count should be 1
+  EXPECT_EQ(flushed_.size(), 1);
+  // First cache miss always get empty response.
+  EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
+
+  // cache negative response
+  EXPECT_OK(aggregator_->CacheResponse(request1_, error_response1_));
+
+  // The second call has BEST_EFFORT mode, should use cached result.
+  request1_.mutable_allocate_operation()->set_quota_mode(QuotaOperation::BEST_EFFORT);
+  EXPECT_OK(aggregator_->Quota(request1_, &response));
+  // quota_call count should still be 1 since cached result is used.
+  EXPECT_EQ(flushed_.size(), 1);
+  // Get the cached response.
+  EXPECT_TRUE(MessageDifferencer::Equals(response, error_response1_));
+
+  // After the first refresh.
+  std::this_thread::sleep_for(std::chrono::milliseconds(kFlushIntervalMs + 10));
+  EXPECT_OK(aggregator_->Flush());
+
+  // Negative result caused a CHECK_ONLY call.
+  // quota_call count should be 2 now
+  EXPECT_EQ(flushed_.size(), 2);
+  EXPECT_EQ(flushed_[0].allocate_operation().quota_mode(),
+            QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_BEST_EFFORT);
+  EXPECT_EQ(flushed_[1].allocate_operation().quota_mode(),
+            QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_BEST_EFFORT);
 
   // Set CHECK_ONLY call response as positive.
   EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));

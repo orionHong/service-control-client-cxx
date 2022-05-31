@@ -57,11 +57,15 @@ QuotaAggregatorImpl::CacheElem::ReturnAllocateQuotaRequestAndClear(
     *(request.mutable_allocate_operation()) =
         operation_aggregator_->ToOperationProto();
     operation_aggregator_ = NULL;
+    request.mutable_allocate_operation()->set_quota_mode(
+        QuotaOperation::BEST_EFFORT);
   } else {
     // If requests are not aggregated, use the stored initial request
     // to allocate minimum token
     request = quota_request_;
-  }
+    request.mutable_allocate_operation()->set_quota_mode(
+        QuotaOperation::CHECK_ONLY);
+ }
 
   return request;
 }
@@ -143,8 +147,11 @@ void QuotaAggregatorImpl::SetFlushCallback(FlushCallback callback) {
     cache_elem->set_in_flight(true);
     cache_->Insert(request_signature, cache_elem, 1);
 
-    // Triggers refresh
-    AddRemovedItem(request);
+    // Call server to report used cost, change mode to BEST_EFFORT.
+    AllocateQuotaRequest request_copy(request);
+    request_copy.mutable_allocate_operation()->set_quota_mode(
+        QuotaOperation::BEST_EFFORT);
+    AddRemovedItem(request_copy);
 
     // return positive response
     *response = cache_elem->quota_response();
@@ -152,7 +159,10 @@ void QuotaAggregatorImpl::SetFlushCallback(FlushCallback callback) {
   }
 
   // Aggregate tokens if the cached response is positive
-  if (lookup.value()->is_positive_response()) {
+  // In BEST_EFFORT mode, costs should be allocated from the limit.
+  if (lookup.value()->is_positive_response() ||
+      request.allocate_operation().quota_mode() ==
+      QuotaOperation::BEST_EFFORT) {
     lookup.value()->Aggregate(request);
   }
 
@@ -264,11 +274,6 @@ void QuotaAggregatorImpl::OnCacheEntryDelete(CacheElem* elem) {
     elem->set_last_refresh_time(SimpleCycleTimer::Now());
     auto request = elem->ReturnAllocateQuotaRequestAndClear(
         service_name_, service_config_id_);
-    if (!elem->is_positive_response()) {
-      request.mutable_allocate_operation()->
-          set_quota_mode(
-              QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_CHECK_ONLY);
-    }
     // Insert the element back to the cache
     // This is important for negative items to reject new requests.
     cache_->Insert(elem->signature(), elem, 1);
