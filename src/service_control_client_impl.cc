@@ -229,26 +229,6 @@ void ServiceControlClientImpl::Check(const CheckRequest& check_request,
   Check(check_request, check_response, on_check_done, check_transport_);
 }
 
-Status ServiceControlClientImpl::Check(const CheckRequest& check_request,
-                                       CheckResponse* check_response) {
-  StatusPromise status_promise;
-  StatusFuture status_future = status_promise.get_future();
-
-  Check(check_request, check_response, [&status_promise](Status status) {
-    // Need to move the promise as it must be owned by the thread where this
-    // lambda is executed rather than the thread where the original Check()
-    // call is executed.
-    // Otherwise, if we call std::promise::set_value(), the original thread will
-    // be unblocked and it might destroy the promise object before set_value()
-    // has a chance to finish.
-    StatusPromise moved_promise(std::move(status_promise));
-    moved_promise.set_value(status);
-  });
-
-  status_future.wait();
-  return status_future.get();
-}
-
 void ServiceControlClientImpl::Quota(const AllocateQuotaRequest& quota_request,
                                      AllocateQuotaResponse* quota_response,
                                      DoneCallback on_quota_done,
@@ -268,7 +248,7 @@ void ServiceControlClientImpl::Quota(const AllocateQuotaRequest& quota_request,
 
     std::shared_ptr<QuotaAggregator> quota_aggregator_copy = quota_aggregator_;
     quota_transport(*quota_request_copy, quota_response,
-                    [this, quota_aggregator_copy, quota_request_copy,
+                    [quota_aggregator_copy, quota_request_copy,
                      quota_response, on_quota_done](Status status) {
 
                       if (status.ok()) {
@@ -305,28 +285,6 @@ void ServiceControlClientImpl::Quota(const AllocateQuotaRequest& quota_request,
   Quota(quota_request, quota_response, on_quota_done, quota_transport_);
 }
 
-// A sync quota call.
-::google::protobuf::util::Status ServiceControlClientImpl::Quota(
-    const AllocateQuotaRequest& quota_request,
-    AllocateQuotaResponse* quota_response) {
-  StatusPromise status_promise;
-  StatusFuture status_future = status_promise.get_future();
-
-  Quota(quota_request, quota_response, [&status_promise](Status status) {
-    // Need to move the promise as it must be owned by the thread where this
-    // lambda is executed rather than the thread where the original Check()
-    // call is executed.
-    // Otherwise, if we call std::promise::set_value(), the original thread will
-    // be unblocked and it might destroy the promise object before set_value()
-    // has a chance to finish.
-    StatusPromise moved_promise(std::move(status_promise));
-    moved_promise.set_value(status);
-  });
-
-  status_future.wait();
-  return status_future.get();
-}
-
 void ServiceControlClientImpl::Report(const ReportRequest& report_request,
                                       ReportResponse* report_response,
                                       DoneCallback on_report_done,
@@ -351,26 +309,6 @@ void ServiceControlClientImpl::Report(const ReportRequest& report_request,
                                       ReportResponse* report_response,
                                       DoneCallback on_report_done) {
   Report(report_request, report_response, on_report_done, report_transport_);
-}
-
-Status ServiceControlClientImpl::Report(const ReportRequest& report_request,
-                                        ReportResponse* report_response) {
-  StatusPromise status_promise;
-  StatusFuture status_future = status_promise.get_future();
-
-  Report(report_request, report_response, [&status_promise](Status status) {
-    // Need to move the promise as it must be owned by the thread where this
-    // lambda is executed rather than the thread where the original Report()
-    // call is executed.
-    // Otherwise, if we call std::promise::set_value(), the original thread will
-    // be unblocked and it might destroy the promise object before set_value()
-    // has a chance to finish.
-    StatusPromise moved_promise(std::move(status_promise));
-    moved_promise.set_value(status);
-  });
-
-  status_future.wait();
-  return status_future.get();
 }
 
 Status ServiceControlClientImpl::GetStatistics(Statistics* stat) const {

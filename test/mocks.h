@@ -32,10 +32,6 @@ class MockServiceControlClient : public ServiceControlClient {
       ::google::api::servicecontrol::v1::CheckResponse* check_response,
       DoneCallback on_check_done));
 
-  MOCK_METHOD(::google::protobuf::util::Status, Check, (
-      const ::google::api::servicecontrol::v1::CheckRequest& check_request,
-      ::google::api::servicecontrol::v1::CheckResponse* check_response));
-
   MOCK_METHOD(void, Check, (
       const ::google::api::servicecontrol::v1::CheckRequest& check_request,
       ::google::api::servicecontrol::v1::CheckResponse* check_response,
@@ -47,12 +43,6 @@ class MockServiceControlClient : public ServiceControlClient {
       ::google::api::servicecontrol::v1::AllocateQuotaResponse* quota_response,
       DoneCallback on_quota_done));
 
-  MOCK_METHOD(::google::protobuf::util::Status, Quota, (
-      const ::google::api::servicecontrol::v1::AllocateQuotaRequest&
-          quota_request,
-      ::google::api::servicecontrol::v1::AllocateQuotaResponse*
-          quota_response));
-
   MOCK_METHOD(void, Quota, (
       const ::google::api::servicecontrol::v1::AllocateQuotaRequest&
           quota_request,
@@ -63,10 +53,6 @@ class MockServiceControlClient : public ServiceControlClient {
       const ::google::api::servicecontrol::v1::ReportRequest& report_request,
       ::google::api::servicecontrol::v1::ReportResponse* report_response,
       DoneCallback on_report_done));
-
-  MOCK_METHOD(::google::protobuf::util::Status, Report, (
-      const ::google::api::servicecontrol::v1::ReportRequest& report_request,
-      ::google::api::servicecontrol::v1::ReportResponse* report_response));
 
   MOCK_METHOD(void, Report, (
       const ::google::api::servicecontrol::v1::ReportRequest& report_request,

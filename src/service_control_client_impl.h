@@ -43,11 +43,6 @@ class ServiceControlClientImpl : public ServiceControlClient {
       ::google::api::servicecontrol::v1::CheckResponse* check_response,
       DoneCallback on_check_done);
 
-  // A sync check call.
-  virtual ::google::protobuf::util::Status Check(
-      const ::google::api::servicecontrol::v1::CheckRequest& check_request,
-      ::google::api::servicecontrol::v1::CheckResponse* check_response);
-
   // A check call with per_request transport.
   virtual void Check(
       const ::google::api::servicecontrol::v1::CheckRequest& check_request,
@@ -60,12 +55,6 @@ class ServiceControlClientImpl : public ServiceControlClient {
           quota_request,
       ::google::api::servicecontrol::v1::AllocateQuotaResponse* quota_response,
       DoneCallback on_quota_done);
-
-  // A sync quota call.
-  virtual ::google::protobuf::util::Status Quota(
-      const ::google::api::servicecontrol::v1::AllocateQuotaRequest&
-          quota_request,
-      ::google::api::servicecontrol::v1::AllocateQuotaResponse* quota_response);
 
   // A quota call with per_request transport.
   virtual void Quota(
@@ -80,13 +69,9 @@ class ServiceControlClientImpl : public ServiceControlClient {
       ::google::api::servicecontrol::v1::ReportResponse* report_response,
       DoneCallback on_report_done);
 
-  // A sync report call.
-  virtual ::google::protobuf::util::Status Report(
-      const ::google::api::servicecontrol::v1::ReportRequest& report_request,
-      ::google::api::servicecontrol::v1::ReportResponse* report_response);
-
   virtual ::google::protobuf::util::Status GetStatistics(
       Statistics* stat) const;
+
   // A report call with per_request transport.
   virtual void Report(
       const ::google::api::servicecontrol::v1::ReportRequest& report_request,

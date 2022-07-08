@@ -11,6 +11,7 @@
 #include "utils/status_test_util.h"
 
 #include <unistd.h>
+#include <thread>
 
 using std::string;
 using ::google::api::servicecontrol::v1::QuotaOperation;

@@ -68,9 +68,6 @@ class MockCheckTransport {
   }
 
   ~MockCheckTransport() {
-    for (auto& callback_thread : callback_threads_) {
-      callback_thread->join();
-    }
   }
 
   // The done callback is stored in on_done_. It MUST be called later.
@@ -95,22 +92,6 @@ class MockCheckTransport {
     on_done(done_status_);
   }
 
-  // The done callback is called from a separate thread with check_status_
-  void CheckUsingThread(const CheckRequest& request, CheckResponse* response,
-                        TransportDoneFunc on_done) {
-    check_request_ = request;
-    Status done_status = done_status_;
-    CheckResponse* check_response = check_response_;
-    MutexLock lock(callback_threads_mutex_);
-    callback_threads_.push_back(std::unique_ptr<Thread>(
-        new Thread([on_done, done_status, check_response, response]() {
-          if (check_response) {
-            *response = *check_response;
-          }
-          on_done(done_status);
-        })));
-  }
-
   // Saved check_request from mocked Transport::Check() call.
   CheckRequest check_request_;
   // If not NULL, the check response to send for mocked Transport::Check() call.
@@ -121,10 +102,6 @@ class MockCheckTransport {
   std::vector<TransportDoneFunc> on_done_vector_;
   // The status to send in on_done call back for Check() or Report().
   Status done_status_;
-  // A mutex to protect callback_threads_
-  Mutex callback_threads_mutex_;
-  // A vector to store thread objects used to call on_done callback.
-  std::vector<std::unique_ptr<std::thread>> callback_threads_;
 };
 
 // A mocking class to mock QuotaTransport interface.
@@ -146,9 +123,6 @@ class MockQuotaTransport {
   }
 
   ~MockQuotaTransport() {
-    for (auto& callback_thread : callback_threads_) {
-      callback_thread->join();
-    }
   }
 
   // The done callback is stored in on_done_. It MUST be called later.
@@ -173,22 +147,6 @@ class MockQuotaTransport {
     on_done(done_status_);
   }
 
-  // The done callback is called from a separate thread with quota_status_
-  void AllocateQuotaUsingThread(const AllocateQuotaRequest& request,
-                                AllocateQuotaResponse* response,
-                                TransportDoneFunc on_done) {
-    quota_request_ = request;
-    Status done_status = done_status_;
-    AllocateQuotaResponse* quota_response = quota_response_;
-    callback_threads_.push_back(std::unique_ptr<Thread>(
-        new Thread([on_done, done_status, quota_response, response]() {
-          if (quota_response) {
-            *response = *quota_response;
-          }
-          on_done(done_status);
-        })));
-  }
-
   // Saved quota_request from mocked Transport::Quota() call.
   AllocateQuotaRequest quota_request_;
   // If not NULL, the quota response to send for mocked Transport::Quota() call.
@@ -199,8 +157,6 @@ class MockQuotaTransport {
   std::vector<TransportDoneFunc> on_done_vector_;
   // The status to send in on_done call back for Quota() or Report().
   Status done_status_;
-  // A vector to store thread objects used to call on_done callback.
-  std::vector<std::unique_ptr<std::thread>> callback_threads_;
 };
 
 // A mocking class to mock ReportTransport interface.
@@ -221,9 +177,6 @@ class MockReportTransport {
   }
 
   ~MockReportTransport() {
-    for (auto& callback_thread : callback_threads_) {
-      callback_thread->join();
-    }
   }
 
   // The done callback is stored in on_done_. It MUST be called later.
@@ -248,18 +201,6 @@ class MockReportTransport {
     on_done(done_status_);
   }
 
-  // The done callback is called from a separate thread with done_status_
-  void ReportUsingThread(const ReportRequest& request, ReportResponse* response,
-                         TransportDoneFunc on_done) {
-    report_request_ = request;
-    if (report_response_) {
-      *response = *report_response_;
-    }
-    Status done_status = done_status_;
-    callback_threads_.push_back(std::unique_ptr<Thread>(
-        new Thread([on_done, done_status]() { on_done(done_status); })));
-  }
-
   // Saved report_request from mocked Transport::Report() call.
   ReportRequest report_request_;
   // If not NULL, the report response to send for mocked Transport::Report()
@@ -271,8 +212,6 @@ class MockReportTransport {
   std::vector<TransportDoneFunc> on_done_vector_;
   // The status to send in on_done call back for Check() or Report().
   Status done_status_;
-  // A vector to store thread objects used to call on_done callback.
-  std::vector<std::unique_ptr<Thread>> callback_threads_;
 };
 
 // A mocking class to mock Periodic_Timer interface.

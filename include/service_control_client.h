@@ -197,25 +197,7 @@ struct Statistics {
 //    std::unique_ptr<ServiceControlClient> client = std::move(
 //       CreateServiceControlClient("your-service-name", options));
 //
-// 2) Makes sync vs async calls.
-//
-// 2.1) Makes sync calls:
-//
-//    // Constructs a CheckRequest protobuf check_request;
-//    CheckResponse check_response;
-//    Status status = client->Check(check_request, &check_response);
-//    if (status.ok()) {
-//       // Inspects check_response;
-//    }
-//
-//    // Constructs a ReportRequest protobuf report_request;
-//    ReportResponse report_response;
-//    Status status = client->Report(report_request, &report_response);
-//    if (status.ok()) {
-//       // Inspects report_response;
-//    }
-//
-// 2.2) Makes async calls:
+// 2.1) Makes async calls:
 //
 //    // Constructs a CheckRequest protobuf check_request;
 //    // Calls async Check by providing a callback.
@@ -237,7 +219,7 @@ struct Statistics {
 //             }
 //         });
 //
-// 2.3) Makes async calls with per_request transport.
+// 2.2) Makes async calls with per_request transport.
 //
 // In some special cases, you may need to pass a per_request context
 // from your calling stack to your transport layer. The library allows
@@ -290,13 +272,6 @@ class ServiceControlClient {
       ::google::api::servicecontrol::v1::CheckResponse* check_response,
       DoneCallback on_check_done) = 0;
 
-  // The sync call.
-  // If it is a cache miss, this function will call remote Chemist server, wait
-  // for its response.
-  virtual ::google::protobuf::util::Status Check(
-      const ::google::api::servicecontrol::v1::CheckRequest& check_request,
-      ::google::api::servicecontrol::v1::CheckResponse* check_response) = 0;
-
   // A check call with provided per_request transport function.
   // Only some special platforms may need to use this function.
   // It allows caller to pass in a per_request transport function.
@@ -311,13 +286,6 @@ class ServiceControlClient {
           quota_request,
       ::google::api::servicecontrol::v1::AllocateQuotaResponse* quota_response,
       DoneCallback on_quota_done) = 0;
-
-  // A sync quota call.
-  virtual ::google::protobuf::util::Status Quota(
-      const ::google::api::servicecontrol::v1::AllocateQuotaRequest&
-          quota_request,
-      ::google::api::servicecontrol::v1::AllocateQuotaResponse*
-          quota_response) = 0;
 
   // A allocateQuota call with provided per_request transport function.
   // Only some special platforms may need to use this function.
@@ -345,14 +313,6 @@ class ServiceControlClient {
       const ::google::api::servicecontrol::v1::ReportRequest& report_request,
       ::google::api::servicecontrol::v1::ReportResponse* report_response,
       DoneCallback on_report_done) = 0;
-
-  // This is sync call.  If Report is cached, the function will return
-  // after the data is saved in the cache. If report is not cached (High
-  // important operations), this function will send the data to remote server,
-  // and wait for its response.
-  virtual ::google::protobuf::util::Status Report(
-      const ::google::api::servicecontrol::v1::ReportRequest& report_request,
-      ::google::api::servicecontrol::v1::ReportResponse* report_response) = 0;
 
   // A report call with provided per_request transport function.
   // Only some special platforms may need to use this function.
