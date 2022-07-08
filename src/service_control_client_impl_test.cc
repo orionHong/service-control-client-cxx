@@ -529,7 +529,7 @@ TEST_F(ServiceControlClientImplTest, TestNonCachedCheckWithStoredCallback) {
   // it will call Transport Check.
   EXPECT_CALL(mock_check_transport_, Check(_, _, _))
       .WillOnce(Invoke(&mock_check_transport_,
-                       &MockCheckTransport::CheckWithStoredCallback));
+                       &MockCheckTransport::CheckWithInplaceCallback));
 }
 
 TEST_F(ServiceControlClientImplTest, TestReplacedGoodCheckWithStoredCallback) {
@@ -562,7 +562,7 @@ TEST_F(ServiceControlClientImplTest, TestReplacedGoodCheckWithStoredCallback) {
   // it will call Transport Check.
   EXPECT_CALL(mock_check_transport_, Check(_, _, _))
       .WillOnce(Invoke(&mock_check_transport_,
-                       &MockCheckTransport::CheckWithStoredCallback));
+                       &MockCheckTransport::CheckWithInplaceCallback));
 }
 
 TEST_F(ServiceControlClientImplTest, TestReplacedBadCheckWithStoredCallback) {
@@ -634,7 +634,7 @@ TEST_F(ServiceControlClientImplTest,
   // it will call Transport Check.
   EXPECT_CALL(mock_check_transport_, Check(_, _, _))
       .WillOnce(Invoke(&mock_check_transport_,
-                       &MockCheckTransport::CheckWithStoredCallback));
+                       &MockCheckTransport::CheckWithInplaceCallback));
 }
 
 TEST_F(ServiceControlClientImplTest, TestNonCachedCheckWithInplaceCallback) {
@@ -655,7 +655,7 @@ TEST_F(ServiceControlClientImplTest, TestNonCachedCheckWithInplaceCallback) {
   // it will call Transport Check.
   EXPECT_CALL(mock_check_transport_, Check(_, _, _))
       .WillOnce(Invoke(&mock_check_transport_,
-                       &MockCheckTransport::CheckWithStoredCallback));
+                       &MockCheckTransport::CheckWithInplaceCallback));
 }
 
 TEST_F(ServiceControlClientImplTest, TestReplacedGoodCheckWithInplaceCallback) {
@@ -674,7 +674,7 @@ TEST_F(ServiceControlClientImplTest, TestReplacedGoodCheckWithInplaceCallback) {
   // it will call Transport Check.
   EXPECT_CALL(mock_check_transport_, Check(_, _, _))
       .WillOnce(Invoke(&mock_check_transport_,
-                       &MockCheckTransport::CheckWithStoredCallback));
+                       &MockCheckTransport::CheckWithInplaceCallback));
 }
 
 TEST_F(ServiceControlClientImplTest, TestReplacedBadCheckWithInplaceCallback) {
