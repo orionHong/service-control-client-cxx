@@ -21,7 +21,6 @@ limitations under the License.
 
 #include <climits>
 
-using std::string;
 using ::google::api::servicecontrol::v1::CheckRequest;
 using ::google::api::servicecontrol::v1::CheckResponse;
 using ::google::api::servicecontrol::v1::AllocateQuotaRequest;
@@ -35,8 +34,23 @@ using ::google::protobuf::util::StatusCode;
 namespace google {
 namespace service_control_client {
 
+// Check if a status represents a fail-open error.
+bool IsQuotaFailOpenError(const absl::Status& status) {
+  switch (status.code()) {
+    case StatusCode::kUnknown:
+    case StatusCode::kUnimplemented:
+    case StatusCode::kUnavailable:
+    case StatusCode::kDeadlineExceeded:
+    case StatusCode::kInternal:
+      return true;
+    default:
+      return false;
+  }
+}
+
+
 ServiceControlClientImpl::ServiceControlClientImpl(
-    const string& service_name, const std::string& service_config_id,
+    const std::string& service_name, const std::string& service_config_id,
     ServiceControlClientOptions& options)
     : service_name_(service_name) {
   check_aggregator_ =
@@ -140,16 +154,25 @@ void ServiceControlClientImpl::AllocateQuotaFlushCallback(
 
   quota_transport_(*quota_request_copy, quota_response,
                    [this, quota_request_copy, quota_response](Status status) {
-                     if (!status.ok()) {
+                     if (status.ok()) {
+                       (void)this->quota_aggregator_->CacheResponse(
+                         *quota_request_copy, *quota_response);
+                     } else if (IsQuotaFailOpenError(status)) {
+                       // Cache dummy response for fail open.
                        GOOGLE_LOG(ERROR) << "Failed in AllocateQuota call: "
-                                         << status.message();
-                       // cache dummy response for fail open
+                                         << status.message()
+                                         << ", but treated as fail-open";
                        AllocateQuotaResponse dummy_response;
                        (void)this->quota_aggregator_->CacheResponse(
-                           *quota_request_copy, dummy_response);
+                         *quota_request_copy, dummy_response);
                      } else {
+                       // Cache error response for fail close.
+                       AllocateQuotaResponse error_response;
+                       QuotaError client_side_error;
+                       *client_side_error.mutable_status() = util::SaveStatusAsRpcStatus(status);
+                       *error_response.add_allocate_errors() = client_side_error;
                        (void)this->quota_aggregator_->CacheResponse(
-                           *quota_request_copy, *quota_response);
+                         *quota_request_copy, error_response);
                      }
 
                      delete quota_request_copy;

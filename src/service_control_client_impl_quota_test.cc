@@ -260,39 +260,71 @@ TEST_F(ServiceControlClientImplQuotaTest, TestCachedQuotaRefreshGotHTTPError) {
   EXPECT_EQ(quota_response.allocate_errors_size(), 0);
 
   // AllocateQuotaFlushCallback replaces the cached response with the
-  // negative response, QUOTA_EXHAUSED
+  // negative response, QUOTA_EXHAUSTED
 
-  // Set callback function to return the negative status
-  // to simulate HTTP error
-  mock_quota_transport_.done_status_ = CancelledError("");
+  // Set the callback function to return a fail-close negative status, e.g.
+  // CancelledError, to simulate HTTP error. A fail-close negative status
+  // will be cached as a negative response.
+  Status cancelledError = CancelledError("cancelled error");
+  mock_quota_transport_.done_status_ = cancelledError;
 
-  // Wait 600ms to trigger the next quota refresh
+  // Wait 600ms to let the cached response expire.
+  // This sleep will not trigger a remote quota call since test did not provide
+  // a timer object. The refresh remote quota call is triggered by cache lookup
+  // in the "Quota" call, for an expired entry, if it has aggregated cost or it
+  // is negative, make a remote quota call.
   std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
-  // Next Quota call reads the cached negative response, and triggers
-  // the quota cache refresh.
+  // Next Quota call reads the cached negative response, QUOTA_EXHAUSTED, and
+  // triggers the quota cache refresh. The CancelledError response will be
+  // cached after this.
   cached_client_->Quota(quota_request1_, &quota_response,
       [&done_status](Status status) { done_status = status; });
-  // Check the cached response is negative
+  // Check the cached response is the first cached response - QUOTA_EXHAUSTED.
   EXPECT_EQ(quota_response.allocate_errors_size(), 1);
+  EXPECT_EQ(quota_response.allocate_errors()[0].code(),
+            error_quota_response1_.allocate_errors[0].code());
 
   // AllocateQuotaFlushCallback replaces the cached negative response with
-  // the temporary positive one for failed open on transport callback error
+  // the newly cached negative response - CancelledError.
 
-  // Read the positive response from the cache
+  // Set the callback function to return a fail-open negative status, e.g.
+  // InternalError. A fail-open dummy response will be cached as a positive
+  // response.
+  mock_quota_transport_.done_status_ = absl::InternalError("internal error");
+
+  // Wait 600ms to let the cached response expire.
+  std::this_thread::sleep_for(std::chrono::milliseconds(600));
+
+  // Read the previously cached CancelledError response, since it is a negative
+  // response, it will trigger a new remote quota call. The new fail-open InternalError
+  // response will be cached right after.
   cached_client_->Quota(
       quota_request1_, &quota_response,
       [&done_status](Status status) { done_status = status; });
 
-  // Check the cached response is positive
+  // Check the returned response is the previously cached CancelledError response.
+  // A fail-close error response is cached as:
+  // AllocateQuoteResponse{allocate_errors:[QuotaError{code:UNSPECIFIED,status:error_status}]}
+  EXPECT_EQ(quota_response.allocate_errors_size(), 1);
+  EXPECT_EQ(quota_response.allocate_errors()[0].status().code(),
+            (int)cancelledError.code());
+  EXPECT_EQ(quota_response.allocate_errors()[0].status().message(),
+            cancelledError.message());
+
+  // Read the newly cached positive dummy response for fail-open.
+  // The dummy response contains no allocate errors.
+  cached_client_->Quota(
+      quota_request1_, &quota_response,
+      [&done_status](Status status) { done_status = status; });
   EXPECT_EQ(quota_response.allocate_errors_size(), 0);
 
   Statistics stat;
   Status stat_status = cached_client_->GetStatistics(&stat);
 
   EXPECT_EQ(stat_status, OkStatus());
-  EXPECT_EQ(stat.total_called_quotas, 3);
-  EXPECT_EQ(stat.send_quotas_by_flush, 2);
+  EXPECT_EQ(stat.total_called_quotas, 4);
+  EXPECT_EQ(stat.send_quotas_by_flush, 3);
   EXPECT_EQ(stat.send_quotas_in_flight, 0);
 }
 
