@@ -19,6 +19,8 @@ limitations under the License.
 #include "google/protobuf/stubs/logging.h"
 #include "utils/thread.h"
 
+#include "util/task/status.h"
+
 #include <climits>
 
 using ::google::api::servicecontrol::v1::CheckRequest;
@@ -27,6 +29,7 @@ using ::google::api::servicecontrol::v1::AllocateQuotaRequest;
 using ::google::api::servicecontrol::v1::AllocateQuotaResponse;
 using ::google::api::servicecontrol::v1::ReportRequest;
 using ::google::api::servicecontrol::v1::ReportResponse;
+using ::google::api::servicecontrol::v1::QuotaError;
 using ::google::protobuf::util::OkStatus;
 using ::google::protobuf::util::Status;
 using ::google::protobuf::util::StatusCode;

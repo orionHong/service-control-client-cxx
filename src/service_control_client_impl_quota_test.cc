@@ -283,7 +283,7 @@ TEST_F(ServiceControlClientImplQuotaTest, TestCachedQuotaRefreshGotHTTPError) {
   // Check the cached response is the first cached response - QUOTA_EXHAUSTED.
   EXPECT_EQ(quota_response.allocate_errors_size(), 1);
   EXPECT_EQ(quota_response.allocate_errors()[0].code(),
-            error_quota_response1_.allocate_errors[0].code());
+            error_quota_response1_.allocate_errors()[0].code());
 
   // AllocateQuotaFlushCallback replaces the cached negative response with
   // the newly cached negative response - CancelledError.
