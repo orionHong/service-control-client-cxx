@@ -282,12 +282,14 @@ class ServiceControlClient {
 
   // An async quota call.
   // When quota cache is enabled:
-  //    When cache hit occurs, `on_quota_done` is called with the cached
-  //    `quota_response`. When cache miss occurs, a quota call is sent to the
-  //    Controller service, and an empty `quota_response` is returned while the
-  //    in-flight quota call is not completed. In other words, the quota call is
-  //    never blocked. This may allow quota to exceed, but it can provide a
-  //    consistent low latency for all quota calls.
+  //    No matter if there is a cache hit, `on_quota_done` is called with a
+  //    cached ok status. In other words, the quota call is never blocked. This
+  //    may allow quota to exceed, but it can provide a consistent low latency
+  //    for all quota calls.
+  //    When cache hit occurs, `quota_response` is filled by the cached
+  //    `AllocateQuotaResponse`. When cache miss occurs, a quota call is sent to
+  //    the Controller service, and an empty `quota_response` is returned while
+  //    the in-flight quota call is not completed.
   //    `quota_response` can be mutated to contain a gRPC server error status in
   //    its `allocate_errors` field. This allows caching for fail-close errors.
   //    In other words, callers should check `quota_response.allocate_errors`
