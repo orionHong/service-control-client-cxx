@@ -35,7 +35,7 @@ namespace service_control_client {
 // Defines a function prototype used when an asynchronous transport call
 // is completed.
 using TransportDoneFunc =
-std::function<void(const ::google::protobuf::util::Status&)>;
+    std::function<void(const ::google::protobuf::util::Status&)>;
 
 // Defines a function prototype to make an asynchronous Check call to
 // the service control server.
@@ -242,7 +242,7 @@ struct Statistics {
 class ServiceControlClient {
  public:
   using DoneCallback =
-  std::function<void(const ::google::protobuf::util::Status&)>;
+      std::function<void(const ::google::protobuf::util::Status&)>;
 
   // Destructor
   virtual ~ServiceControlClient() {}
@@ -294,7 +294,7 @@ class ServiceControlClient {
   // quota_response must be alive until on_quota_done is called.
   virtual void Quota(
       const ::google::api::servicecontrol::v1::AllocateQuotaRequest&
-      quota_request,
+          quota_request,
       ::google::api::servicecontrol::v1::AllocateQuotaResponse* quota_response,
       DoneCallback on_quota_done) = 0;
 
@@ -303,7 +303,7 @@ class ServiceControlClient {
   // It allows caller to pass in a per_request transport function.
   virtual void Quota(
       const ::google::api::servicecontrol::v1::AllocateQuotaRequest&
-      quota_request,
+          quota_request,
       ::google::api::servicecontrol::v1::AllocateQuotaResponse* quota_response,
       DoneCallback on_quota_done, TransportQuotaFunc quota_transport) = 0;
 
