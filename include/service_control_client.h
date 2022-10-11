@@ -292,9 +292,9 @@ class ServiceControlClient {
   //    the in-flight quota call is not completed.
   //    `quota_response` can be mutated to contain a gRPC server error status in
   //    its `allocate_errors` field. This allows caching for fail-close errors.
-  //    In other words, callers should check `quota_response.allocate_errors`
-  //    for Controller service quota errors and gRPC errors (typically these
-  //    errors are client-side errors corresponding to 4xx in HTTP).
+  //    This means callers should check `quota_response.allocate_errors` for
+  //    Controller service quota errors and gRPC errors (typically these errors
+  //    are client-side errors corresponding to 4xx in HTTP).
   // When quota cache is disabled:
   //    `on_quota_done` is called with the quota status returned from the
   //    Controller service. Unlike quota cache where a gRPC server error status
