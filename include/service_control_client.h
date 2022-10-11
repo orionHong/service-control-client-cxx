@@ -284,8 +284,8 @@ class ServiceControlClient {
   // When quota cache is enabled:
   //    No matter if there is a cache hit, `on_quota_done` is called with a
   //    cached ok status. In other words, the quota call is never blocked. This
-  //    may allow quota to exceed, but it can provide a consistent low latency
-  //    for all quota calls.
+  //    may allow quota to exceed, but it can provide all quota calls with a
+  //    consistently low latency.
   //    When cache hit occurs, `quota_response` is filled by the cached
   //    `AllocateQuotaResponse`. When cache miss occurs, a quota call is sent to
   //    the Controller service, and an empty `quota_response` is returned while
