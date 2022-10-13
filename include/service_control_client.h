@@ -281,6 +281,27 @@ class ServiceControlClient {
       DoneCallback on_check_done, TransportCheckFunc check_transport) = 0;
 
   // An async quota call.
+  // When quota cache is enabled:
+  //    No matter if there is a cache hit, `on_quota_done` is called with a
+  //    cached ok status. In other words, the quota call is never blocked. This
+  //    may allow quota to exceed, but it can provide all quota calls with a
+  //    consistently low latency.
+  //    When cache hit occurs, `quota_response` is filled by the cached
+  //    `AllocateQuotaResponse`. When cache miss occurs, a quota call is sent to
+  //    the Controller service, and an empty `quota_response` is returned while
+  //    the in-flight quota call is not completed.
+  //    `quota_response` can be mutated to contain a gRPC server error status in
+  //    its `allocate_errors` field. This allows caching for fail-close errors.
+  //    This means callers should check `quota_response.allocate_errors` for
+  //    Controller service quota errors and gRPC errors (typically these errors
+  //    are client-side errors corresponding to 4xx in HTTP).
+  // When quota cache is disabled:
+  //    `on_quota_done` is called with the quota status returned from the
+  //    Controller service. Unlike quota cache where a gRPC server error status
+  //    is embedded in `quota_response.allocate_errors`, a raw gRPC server error
+  //    status can be passed to `on_quota_done`.
+  //
+  // `quota_response` must be alive until on_quota_done is called.
   virtual void Quota(
       const ::google::api::servicecontrol::v1::AllocateQuotaRequest&
           quota_request,
