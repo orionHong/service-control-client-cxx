@@ -45,6 +45,7 @@ cc_library(
         "include/service_control_client.h",
         "include/service_control_client_factory.h",
         "utils/distribution_helper.h",
+        "utils/status.h",
         "utils/simple_lru_cache.h",
         "utils/simple_lru_cache_inl.h",
     ],

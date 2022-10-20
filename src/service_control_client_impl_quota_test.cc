@@ -291,7 +291,7 @@ TEST_F(ServiceControlClientImplQuotaTest, TestCachedQuotaRefreshGotHTTPError) {
   // Set the callback function to return a fail-open negative status, e.g.
   // InternalError. A fail-open dummy response will be cached as a positive
   // response.
-  mock_quota_transport_.done_status_ = absl::InternalError("internal error");
+  mock_quota_transport_.done_status_ = InternalError("internal error");
 
   // Wait 600ms to let the cached response expire.
   std::this_thread::sleep_for(std::chrono::milliseconds(600));

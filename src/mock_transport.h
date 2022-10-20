@@ -38,6 +38,7 @@ using ::google::api::servicecontrol::v1::ReportResponse;
 using ::google::protobuf::TextFormat;
 using ::google::protobuf::util::MessageDifferencer;
 using ::google::protobuf::util::CancelledError;
+using ::google::protobuf::util::InternalError;
 using ::google::protobuf::util::OkStatus;
 using ::google::protobuf::util::Status;
 using ::google::protobuf::util::StatusCode;

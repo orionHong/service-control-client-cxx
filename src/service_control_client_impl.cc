@@ -18,8 +18,7 @@ limitations under the License.
 
 #include "google/protobuf/stubs/logging.h"
 #include "utils/thread.h"
-
-#include "util/task/status.h"
+#include "utils/status.h"
 
 #include <climits>
 
@@ -33,12 +32,13 @@ using ::google::api::servicecontrol::v1::QuotaError;
 using ::google::protobuf::util::OkStatus;
 using ::google::protobuf::util::Status;
 using ::google::protobuf::util::StatusCode;
+using ::google::service_control_client::SaveStatusAsRpcStatus;
 
 namespace google {
 namespace service_control_client {
 
 // Check if a status represents a fail-open error.
-bool IsQuotaFailOpenError(const absl::Status& status) {
+bool IsQuotaFailOpenError(const Status& status) {
   switch (status.code()) {
     case StatusCode::kUnknown:
     case StatusCode::kUnimplemented:
@@ -172,7 +172,7 @@ void ServiceControlClientImpl::AllocateQuotaFlushCallback(
                        // Cache error response for fail close.
                        AllocateQuotaResponse error_response;
                        QuotaError client_side_error;
-                       *client_side_error.mutable_status() = util::SaveStatusAsRpcStatus(status);
+                       *client_side_error.mutable_status() = SaveStatusAsRpcStatus(status);
                        *error_response.add_allocate_errors() = client_side_error;
                        (void)this->quota_aggregator_->CacheResponse(
                          *quota_request_copy, error_response);
