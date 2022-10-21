@@ -225,21 +225,20 @@ void ServiceControlClientImpl::Check(const CheckRequest& check_request,
 
   Status status = check_aggregator_->Check(check_request, check_response);
   if (status.code() == StatusCode::kNotFound) {
-    // Makes a copy of check_request so that on_done() callback can use
-    // it to call CacheResponse.
-    CheckRequest* check_request_copy = new CheckRequest(check_request);
+    std::string
+        check_request_signature = GenerateCheckRequestSignature(check_request);
     std::shared_ptr<CheckAggregator> check_aggregator_copy = check_aggregator_;
-    check_transport(*check_request_copy, check_response,
-                    [check_aggregator_copy, check_request_copy, check_response,
-                     on_check_done](Status status) {
+    check_transport(check_request, check_response,
+                    [check_aggregator_copy, check_request_signature =
+                    std::move(check_request_signature), check_response,
+                        on_check_done](Status status) {
                       if (status.ok()) {
                         (void)check_aggregator_copy->CacheResponse(
-                            *check_request_copy, *check_response);
+                            check_request_signature, *check_response);
                       } else {
                         GOOGLE_LOG(ERROR) << "Failed in Check call: "
                                           << status.message();
                       }
-                      delete check_request_copy;
                       on_check_done(status);
                     });
     ++send_checks_in_flight_;

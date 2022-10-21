@@ -174,14 +174,13 @@ bool CheckAggregatorImpl::ShouldFlush(const CacheElem& elem) {
   return age >= flush_interval_in_cycle_;
 }
 
-Status CheckAggregatorImpl::CacheResponse(const CheckRequest& request,
+Status CheckAggregatorImpl::CacheResponse(const std::string& request_signature,
                                           const CheckResponse& response) {
   CheckCacheRemovedItemsHandler::StackBuffer stack_buffer(this);
   MutexLock lock(cache_mutex_);
   CheckCacheRemovedItemsHandler::StackBuffer::Swapper swapper(this,
                                                               &stack_buffer);
   if (cache_) {
-    string request_signature = GenerateCheckRequestSignature(request);
     CheckCache::ScopedLookup lookup(cache_.get(), request_signature);
 
     int64_t now = SimpleCycleTimer::Now();

@@ -141,7 +141,7 @@ class CheckAggregator {
 
   // Caches a response from a remote Service Controller Check call.
   virtual ::google::protobuf::util::Status CacheResponse(
-      const ::google::api::servicecontrol::v1::CheckRequest& request,
+      const std::string& request_signature,
       const ::google::api::servicecontrol::v1::CheckResponse& response) = 0;
 
   // When the next Flush() should be called.

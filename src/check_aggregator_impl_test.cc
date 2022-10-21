@@ -20,6 +20,7 @@ limitations under the License.
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
 #include "utils/status_test_util.h"
+#include "src/signature.h"
 
 #include <unistd.h>
 
@@ -120,12 +121,14 @@ class CheckAggregatorImplTest : public ::testing::Test {
  public:
   void SetUp() {
     ASSERT_TRUE(TextFormat::ParseFromString(kRequest1, &request1_));
+    request_signature1_ = GenerateCheckRequestSignature(request1_);
     ASSERT_TRUE(
         TextFormat::ParseFromString(kSuccessResponse1, &pass_response1_));
     ASSERT_TRUE(
         TextFormat::ParseFromString(kErrorResponse1, &error_response1_));
 
     ASSERT_TRUE(TextFormat::ParseFromString(kRequest2, &request2_));
+    request_signature2_ = GenerateCheckRequestSignature(request2_);
     ASSERT_TRUE(
         TextFormat::ParseFromString(kSuccessResponse2, &pass_response2_));
     ASSERT_TRUE(
@@ -148,16 +151,19 @@ class CheckAggregatorImplTest : public ::testing::Test {
 
   void FlushCallbackCallingBackToAggregator(const CheckRequest& request) {
     flushed_.push_back(request);
-    (void)aggregator_->CacheResponse(request, pass_response1_);
+    (void)aggregator_->CacheResponse(
+        GenerateCheckRequestSignature(request), pass_response1_);
   }
 
   CheckRequest request1_;
   CheckResponse pass_response1_;
   CheckResponse error_response1_;
+  std::string request_signature1_;
 
   CheckRequest request2_;
   CheckResponse pass_response2_;
   CheckResponse error_response2_;
+  std::string request_signature2_;
 
   std::unique_ptr<CheckAggregator> aggregator_;
   std::vector<CheckRequest> flushed_;
@@ -197,7 +203,7 @@ TEST_F(CheckAggregatorImplTest, TestCachePassResponses) {
   CheckResponse response;
   EXPECT_ERROR_CODE(StatusCode::kNotFound, aggregator_->Check(request1_, &response));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
   EXPECT_EQ(flushed_.size(), 0);
@@ -211,7 +217,7 @@ TEST_F(CheckAggregatorImplTest, TestCacheErrorResponses) {
   CheckResponse response;
   EXPECT_ERROR_CODE(StatusCode::kNotFound, aggregator_->Check(request1_, &response));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, error_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, error_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, error_response1_));
   EXPECT_EQ(flushed_.size(), 0);
@@ -225,13 +231,13 @@ TEST_F(CheckAggregatorImplTest, TestCacheCapacity) {
   CheckResponse response;
   EXPECT_ERROR_CODE(StatusCode::kNotFound, aggregator_->Check(request1_, &response));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
   EXPECT_EQ(flushed_.size(), 0);
 
   EXPECT_ERROR_CODE(StatusCode::kNotFound, aggregator_->Check(request2_, &response));
-  EXPECT_OK(aggregator_->CacheResponse(request2_, pass_response2_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature2_, pass_response2_));
   EXPECT_OK(aggregator_->Check(request2_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response2_));
   EXPECT_EQ(flushed_.size(), 1);
@@ -246,7 +252,7 @@ TEST_F(CheckAggregatorImplTest, TestRefresh) {
   CheckResponse response;
   EXPECT_ERROR_CODE(StatusCode::kNotFound, aggregator_->Check(request1_, &response));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
 
@@ -277,7 +283,7 @@ TEST_F(CheckAggregatorImplTest, TestCacheExpired) {
   CheckResponse response;
   EXPECT_ERROR_CODE(StatusCode::kNotFound, aggregator_->Check(request1_, &response));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
   EXPECT_EQ(flushed_.size(), 0);
@@ -300,7 +306,7 @@ TEST_F(CheckAggregatorImplTest, TestFlushAllWithCallbackCallingCacheResposne) {
 
   CheckResponse response;
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
   EXPECT_OK(aggregator_->FlushAll());
   // FlushAll() will call flush callback to flush out request1, then callback
@@ -314,9 +320,9 @@ TEST_F(CheckAggregatorImplTest,
       std::bind(&CheckAggregatorImplTest::FlushCallbackCallingBackToAggregator,
                 this, std::placeholders::_1));
   CheckResponse response;
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
-  EXPECT_OK(aggregator_->CacheResponse(request2_, pass_response2_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature2_, pass_response2_));
   // CacheResponse() will call flush callback to flush out request1 since cache
   // capacity is 1.
   EXPECT_EQ(flushed_.size(), 1);
@@ -328,7 +334,7 @@ TEST_F(CheckAggregatorImplTest, TestCheckWithCallbackCallingCacheResposne) {
                 this, std::placeholders::_1));
   CheckResponse response;
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Check(request1_, &response));
 
   usleep(220000);
