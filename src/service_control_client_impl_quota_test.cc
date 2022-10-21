@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "src/mock_transport.h"
-
 #include <thread>
 #include <chrono>
+
+#include "src/mock_transport.h"
 
 namespace google {
 namespace service_control_client {
@@ -81,7 +81,7 @@ allocate_errors {
 
 }  // namespace
 
-class ServiceControlClientImplQuotaTest : public ::testing::Test {
+class ServiceControlClientImplQuotaTest : public testing::Test {
  public:
   void SetUp() {
     ASSERT_TRUE(TextFormat::ParseFromString(kRequest1, &quota_request1_));
@@ -185,7 +185,8 @@ TEST_F(ServiceControlClientImplQuotaTest,
   client->Quota(quota_request1_, &quota_response,
                 [&done_status](Status status) { done_status = status; });
 
-  EXPECT_EQ(done_status, Status(StatusCode::kInvalidArgument, "transport is NULL."));
+  EXPECT_EQ(done_status,
+            Status(StatusCode::kInvalidArgument, "transport is NULL."));
 
   // count store callback
   EXPECT_EQ(mock_quota_transport_.on_done_vector_.size(), 0);
@@ -458,6 +459,40 @@ TEST_F(ServiceControlClientImplQuotaTest,
 
   // count store callback
   EXPECT_EQ(mock_quota_transport_.on_done_vector_.size(), 0);
+
+  Statistics stat;
+  Status stat_status = noncached_client_->GetStatistics(&stat);
+
+  EXPECT_EQ(stat_status, OkStatus());
+  EXPECT_EQ(stat.total_called_quotas, 1);
+  EXPECT_EQ(stat.send_quotas_by_flush, 0);
+  EXPECT_EQ(stat.send_quotas_in_flight, 1);
+}
+
+// Cached: false, Callback: in place
+TEST_F(ServiceControlClientImplQuotaTest,
+       TestNonCachedQuotaWithInplaceCallbackNetworkErrorFailOpen) {
+  // Set the callback function to return a gRPC error. When there's a gRPC
+  // error, we consider it a fail-open network error.
+  mock_quota_transport_.done_status_ = CancelledError("cancelled error");
+
+  EXPECT_CALL(mock_quota_transport_, Quota(_, _, _))
+      .WillOnce(
+          Invoke(&mock_quota_transport_,
+                 &MockQuotaTransport::AllocateQuotaWithInplaceCallback));
+
+  Status done_status = OkStatus();
+  AllocateQuotaResponse quota_response;
+  noncached_client_->Quota(
+      quota_request1_, &quota_response,
+      [&done_status](Status status) { done_status = status; });
+
+  // done_status should be set to CancelledError immediately since there's no
+  // cache.
+  EXPECT_EQ(done_status, CancelledError("cancelled error"));
+
+  // Since errors are fail-open, quota_response should contain no error.
+  EXPECT_EQ(quota_response.allocate_errors_size(), 0);
 
   Statistics stat;
   Status stat_status = noncached_client_->GetStatistics(&stat);

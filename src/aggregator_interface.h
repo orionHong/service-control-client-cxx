@@ -17,6 +17,7 @@ limitations under the License.
 #define GOOGLE_SERVICE_CONTROL_CLIENT_AGGREGATOR_INTERFACE_H_
 
 #include <string.h>
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -91,7 +92,7 @@ class QuotaAggregator {
 
   // Caches a response from a remote Service Controller AllocateQuota call.
   virtual ::google::protobuf::util::Status CacheResponse(
-      const ::google::api::servicecontrol::v1::AllocateQuotaRequest& request,
+      const std::string& request_signature,
       const ::google::api::servicecontrol::v1::AllocateQuotaResponse&
           response) = 0;
 

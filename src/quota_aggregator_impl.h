@@ -70,7 +70,7 @@ class QuotaAggregatorImpl : public QuotaAggregator,
 
   // Caches a response from a remote Service Controller AllocateQuota call.
   ::google::protobuf::util::Status CacheResponse(
-      const ::google::api::servicecontrol::v1::AllocateQuotaRequest& request,
+      const std::string& request_signature,
       const ::google::api::servicecontrol::v1::AllocateQuotaResponse& response);
 
  private:

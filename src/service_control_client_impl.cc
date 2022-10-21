@@ -19,13 +19,14 @@ limitations under the License.
 #include "google/protobuf/stubs/logging.h"
 #include "utils/thread.h"
 #include "utils/status.h"
+#include "src/signature.h"
 
 #include <climits>
 
-using ::google::api::servicecontrol::v1::CheckRequest;
-using ::google::api::servicecontrol::v1::CheckResponse;
 using ::google::api::servicecontrol::v1::AllocateQuotaRequest;
 using ::google::api::servicecontrol::v1::AllocateQuotaResponse;
+using ::google::api::servicecontrol::v1::CheckRequest;
+using ::google::api::servicecontrol::v1::CheckResponse;
 using ::google::api::servicecontrol::v1::ReportRequest;
 using ::google::api::servicecontrol::v1::ReportResponse;
 using ::google::api::servicecontrol::v1::QuotaError;
@@ -50,7 +51,6 @@ bool IsQuotaFailOpenError(const Status& status) {
       return false;
   }
 }
-
 
 ServiceControlClientImpl::ServiceControlClientImpl(
     const std::string& service_name, const std::string& service_config_id,
@@ -108,7 +108,6 @@ ServiceControlClientImpl::ServiceControlClientImpl(
     flush_timer_ = options.periodic_timer(
         flush_interval, [check_aggregator_copy, quota_aggregator_copy,
                          report_aggregator_copy]() {
-
           Status status = check_aggregator_copy->Flush();
           if (!status.ok()) {
             GOOGLE_LOG(ERROR) << "Failed in Check::Flush() "
@@ -151,15 +150,16 @@ ServiceControlClientImpl::~ServiceControlClientImpl() {
 
 void ServiceControlClientImpl::AllocateQuotaFlushCallback(
     const AllocateQuotaRequest& quota_request) {
-  AllocateQuotaRequest* quota_request_copy =
-      new AllocateQuotaRequest(quota_request);
+  std::string quota_request_signature =
+      GenerateAllocateQuotaRequestSignature(quota_request);
   AllocateQuotaResponse* quota_response = new AllocateQuotaResponse;
 
-  quota_transport_(*quota_request_copy, quota_response,
-                   [this, quota_request_copy, quota_response](Status status) {
+  quota_transport_(quota_request, quota_response,
+                   [this, quota_request_signature =
+                   std::move(quota_request_signature), quota_response](Status status) {
                      if (status.ok()) {
                        (void)this->quota_aggregator_->CacheResponse(
-                         *quota_request_copy, *quota_response);
+                           quota_request_signature, *quota_response);
                      } else if (IsQuotaFailOpenError(status)) {
                        // Cache dummy response for fail open.
                        GOOGLE_LOG(ERROR) << "Failed in AllocateQuota call: "
@@ -167,7 +167,7 @@ void ServiceControlClientImpl::AllocateQuotaFlushCallback(
                                          << ", but treated as fail-open";
                        AllocateQuotaResponse dummy_response;
                        (void)this->quota_aggregator_->CacheResponse(
-                         *quota_request_copy, dummy_response);
+                           quota_request_signature, dummy_response);
                      } else {
                        // Cache error response for fail close.
                        AllocateQuotaResponse error_response;
@@ -175,10 +175,9 @@ void ServiceControlClientImpl::AllocateQuotaFlushCallback(
                        *client_side_error.mutable_status() = SaveStatusAsRpcStatus(status);
                        *error_response.add_allocate_errors() = client_side_error;
                        (void)this->quota_aggregator_->CacheResponse(
-                         *quota_request_copy, error_response);
+                         quota_request_signature, error_response);
                      }
 
-                     delete quota_request_copy;
                      delete quota_response;
                    });
 
@@ -267,31 +266,28 @@ void ServiceControlClientImpl::Quota(const AllocateQuotaRequest& quota_request,
 
   Status status = quota_aggregator_->Quota(quota_request, quota_response);
   if (status.code() == StatusCode::kNotFound) {
-    // Makes a copy of check_request so that on_done() callback can use
-    // it to call CacheResponse.
-    AllocateQuotaRequest* quota_request_copy =
-        new AllocateQuotaRequest(quota_request);
+    std::string quota_request_signature =
+        GenerateAllocateQuotaRequestSignature(quota_request);
 
     std::shared_ptr<QuotaAggregator> quota_aggregator_copy = quota_aggregator_;
-    quota_transport(*quota_request_copy, quota_response,
-                    [quota_aggregator_copy, quota_request_copy,
-                     quota_response, on_quota_done](Status status) {
+    quota_transport(quota_request, quota_response,
+                    [quota_aggregator_copy, quota_request_signature =
+                    std::move(quota_request_signature),
+                        quota_response, on_quota_done](Status status) {
 
                       if (status.ok()) {
                         (void)quota_aggregator_copy->CacheResponse(
-                            *quota_request_copy, *quota_response);
+                            quota_request_signature, *quota_response);
                       } else {
                         // on network error, failed open, reset in_flight flag
                         // to false
                         AllocateQuotaResponse dummy_response;
                         (void)quota_aggregator_copy->CacheResponse(
-                            *quota_request_copy, dummy_response);
+                            quota_request_signature, dummy_response);
 
                         GOOGLE_LOG(ERROR) << "Failed in Quota call: "
                                           << status.message();
                       }
-
-                      delete quota_request_copy;
 
                       on_quota_done(status);
                     });

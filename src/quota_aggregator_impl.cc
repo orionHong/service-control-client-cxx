@@ -172,13 +172,11 @@ void QuotaAggregatorImpl::SetFlushCallback(FlushCallback callback) {
 
 // Caches a response from a remote Service Controller AllocateQuota call.
 ::google::protobuf::util::Status QuotaAggregatorImpl::CacheResponse(
-    const ::google::api::servicecontrol::v1::AllocateQuotaRequest& request,
+    const std::string& request_signature,
     const ::google::api::servicecontrol::v1::AllocateQuotaResponse& response) {
   if (!cache_) {
     return ::google::protobuf::util::OkStatus();
   }
-
-  string request_signature = GenerateAllocateQuotaRequestSignature(request);
 
   AllocateQuotaCacheRemovedItemsHandler::StackBuffer stack_buffer(this);
   MutexLock lock(cache_mutex_);

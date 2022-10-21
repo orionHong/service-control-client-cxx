@@ -2,26 +2,25 @@
 
 #include "src/quota_aggregator_impl.h"
 
+#include <thread>
 #include <unordered_map>
 
 #include "gmock/gmock.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/util/message_differencer.h"
 #include "gtest/gtest.h"
+#include "src/signature.h"
 #include "utils/status_test_util.h"
 
-#include <unistd.h>
-#include <thread>
-
-using std::string;
-using ::google::api::servicecontrol::v1::QuotaOperation;
 using ::google::api::servicecontrol::v1::AllocateQuotaRequest;
 using ::google::api::servicecontrol::v1::AllocateQuotaResponse;
+using ::google::api::servicecontrol::v1::QuotaOperation;
 using ::google::api::servicecontrol::v1::QuotaOperation_QuotaMode;
 using ::google::protobuf::TextFormat;
 using ::google::protobuf::util::MessageDifferencer;
 using ::google::protobuf::util::Status;
 using ::google::protobuf::util::StatusCode;
+using std::string;
 
 namespace google {
 namespace service_control_client {
@@ -179,12 +178,16 @@ const std::set<std::pair<std::string, int>> ExtractMetricSets(
 
 }  // namespace
 
-class QuotaAggregatorImplTest : public ::testing::Test {
+class QuotaAggregatorImplTest : public testing::Test {
  public:
   void SetUp() {
     ASSERT_TRUE(TextFormat::ParseFromString(kRequest1, &request1_));
     ASSERT_TRUE(TextFormat::ParseFromString(kRequest2, &request2_));
     ASSERT_TRUE(TextFormat::ParseFromString(kRequest3, &request3_));
+
+    request_signature1_ = GenerateAllocateQuotaRequestSignature(request1_);
+    request_signature2_ = GenerateAllocateQuotaRequestSignature(request2_);
+    request_signature3_ = GenerateAllocateQuotaRequestSignature(request3_);
 
     ASSERT_TRUE(
         TextFormat::ParseFromString(kSuccessResponse1, &pass_response1_));
@@ -215,12 +218,17 @@ class QuotaAggregatorImplTest : public ::testing::Test {
   void FlushCallbackCallingBackToAggregator(
       const AllocateQuotaRequest& request) {
     flushed_.push_back(request);
-    (void)aggregator_->CacheResponse(request, pass_response1_);
+    (void)aggregator_->CacheResponse(
+        GenerateAllocateQuotaRequestSignature(request), pass_response1_);
   }
 
   AllocateQuotaRequest request1_;
   AllocateQuotaRequest request2_;
   AllocateQuotaRequest request3_;
+
+  string request_signature1_;
+  string request_signature2_;
+  string request_signature3_;
 
   AllocateQuotaResponse pass_response1_;
   AllocateQuotaResponse pass_response2_;
@@ -240,7 +248,7 @@ TEST_F(QuotaAggregatorImplTest, TestRequestAndCache) {
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
@@ -252,7 +260,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheElementStayByAggregate) {
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // Use cached result, and add the cost to aggregator
   EXPECT_OK(aggregator_->Quota(request1_, &response));
@@ -272,7 +280,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheElementStayByNegative) {
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, error_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, error_response1_));
 
   // Use the cached negative result.
   EXPECT_OK(aggregator_->Quota(request1_, &response));
@@ -292,7 +300,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheElementStayWithNonAggregated) {
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // When refresh comes, the cache item is a non-aggregated positive item.
   // It is still kept in the cache.
@@ -310,7 +318,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheElementDrop) {
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(kExpirationMs + 10));
   EXPECT_OK(aggregator_->Flush());
@@ -318,7 +326,6 @@ TEST_F(QuotaAggregatorImplTest, TestCacheElementDrop) {
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 }
-
 
 TEST_F(QuotaAggregatorImplTest, TestNotMatchingServiceName) {
   *(request1_.mutable_service_name()) = "some-other-service-name";
@@ -340,7 +347,7 @@ TEST_F(QuotaAggregatorImplTest, TestFlushAggregatedRecord) {
   AllocateQuotaResponse response;
 
   EXPECT_ERROR_CODE(StatusCode::kOk, aggregator_->Quota(request1_, &response));
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
 
@@ -357,7 +364,7 @@ TEST_F(QuotaAggregatorImplTest, TestFlushedBeforeRefreshTimeout) {
   AllocateQuotaResponse response;
 
   EXPECT_ERROR_CODE(StatusCode::kOk, aggregator_->Quota(request1_, &response));
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   EXPECT_OK(aggregator_->Quota(request1_, &response));
   EXPECT_TRUE(MessageDifferencer::Equals(response, pass_response1_));
 
@@ -389,7 +396,7 @@ TEST_F(QuotaAggregatorImplTest, TestInflightCache) {
   EXPECT_EQ(flushed_.size(), 1);
 
   // update the response in the cache and set in_flight flag off
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // hit cached response and aggregate
   EXPECT_ERROR_CODE(StatusCode::kOk, aggregator_->Quota(request1_, &response));
@@ -412,13 +419,13 @@ TEST_F(QuotaAggregatorImplTest, TestCacheAggregateAfterRefreshAndCacheUpdate) {
   // insert request1
   EXPECT_ERROR_CODE(StatusCode::kOk, aggregator_->Quota(request1_, &response1));
   EXPECT_EQ(flushed_.size(), 1);
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   // insert request2
   EXPECT_ERROR_CODE(StatusCode::kOk, aggregator_->Quota(request2_, &response2));
-  EXPECT_OK(aggregator_->CacheResponse(request2_, pass_response2_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature2_, pass_response2_));
 
   // aggregate request1
   EXPECT_OK(aggregator_->Quota(request1_, &response1));
@@ -456,7 +463,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheAggregateAfterRefreshAndCacheUpdate) {
   ASSERT_EQ(quota_metrics, expected_costs);
 
   // reset in_flight flag for request1
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response2_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response2_));
 
   // expire temporary elements for refreshment from the cache
   std::this_thread::sleep_for(std::chrono::milliseconds(110));
@@ -482,7 +489,7 @@ TEST_F(QuotaAggregatorImplTest,
   std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
   // response has arrived
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
   std::this_thread::sleep_for(std::chrono::milliseconds(30));
 
   // aggregated to request1
@@ -494,7 +501,7 @@ TEST_F(QuotaAggregatorImplTest,
   // expire request1, temporary 1 inserted
   EXPECT_OK(aggregator_->Flush());
   EXPECT_EQ(flushed_.size(), 2);
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // aggregated to temporary three times
   EXPECT_OK(aggregator_->Quota(request1_, &response1));
@@ -506,7 +513,7 @@ TEST_F(QuotaAggregatorImplTest,
 
   EXPECT_OK(aggregator_->Quota(request1_, &response1));
   EXPECT_EQ(flushed_.size(), 3);
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(110));
 
@@ -516,7 +523,7 @@ TEST_F(QuotaAggregatorImplTest,
   // check
   EXPECT_EQ(flushed_.size(), 4);
   // response has arrived, set in_flight flag off
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // temporary 1 will be flushed
   EXPECT_EQ(flushed_.size(), 4);
@@ -550,14 +557,14 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshOneAggregated) {
   // insert request 1
   EXPECT_ERROR_CODE(StatusCode::kOk, aggregator_->Quota(request1_, &response1));
   EXPECT_EQ(flushed_.size(), 1);
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   // insert request 2
   EXPECT_ERROR_CODE(StatusCode::kOk, aggregator_->Quota(request2_, &response2));
   EXPECT_EQ(flushed_.size(), 2);
-  EXPECT_OK(aggregator_->CacheResponse(request2_, pass_response2_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature2_, pass_response2_));
 
   // aggregate request 1
   EXPECT_OK(aggregator_->Quota(request1_, &response1));
@@ -570,7 +577,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshOneAggregated) {
 
   // expire request1
   EXPECT_OK(aggregator_->Flush());
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // check request1 has flushed out
   EXPECT_EQ(flushed_.size(), 3);
@@ -583,7 +590,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshOneAggregated) {
 
   // expire request2
   EXPECT_OK(aggregator_->Flush());
-  EXPECT_OK(aggregator_->CacheResponse(request2_, pass_response2_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature2_, pass_response2_));
 
   // the second cached item did not have aggregated quota, when it is flushed,
   // it was dropped.
@@ -608,7 +615,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaModeBestEffort) {
   // check refresh
   EXPECT_EQ(flushed_.size(), 1);
   // cache positive response
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
@@ -621,7 +628,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaModeBestEffort) {
 
   // check refresh request
   EXPECT_EQ(flushed_.size(), 2);
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   EXPECT_EQ(flushed_[0].allocate_operation().quota_mode(),
             QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_BEST_EFFORT);
@@ -640,7 +647,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegative) {
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
   // cache negative response
-  EXPECT_OK(aggregator_->CacheResponse(request1_, error_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, error_response1_));
 
   // Make a second call, should use cached result.
   EXPECT_OK(aggregator_->Quota(request1_, &response));
@@ -662,7 +669,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegative) {
             QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_CHECK_ONLY);
 
   // Set CHECK_ONLY call response as positive.
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // Next call should be positive
   EXPECT_OK(aggregator_->Quota(request1_, &response));
@@ -671,7 +678,8 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegative) {
 
 }
 
-TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegativeBestEffort) {
+TEST_F(QuotaAggregatorImplTest,
+       TestCacheRefreshQuotaCallForNegativeBestEffort) {
   AllocateQuotaResponse response;
 
   // trigger initial allocation
@@ -682,7 +690,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegativeBestEffort) 
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
   // cache negative response
-  EXPECT_OK(aggregator_->CacheResponse(request1_, error_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, error_response1_));
 
   // The second call has BEST_EFFORT mode, should use cached result.
   request1_.mutable_allocate_operation()->set_quota_mode(QuotaOperation::BEST_EFFORT);
@@ -705,7 +713,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNegativeBestEffort) 
             QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_BEST_EFFORT);
 
   // Set CHECK_ONLY call response as positive.
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // Next call should be positive
   EXPECT_OK(aggregator_->Quota(request1_, &response));
@@ -725,7 +733,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForAggregated) {
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
   // cache negative response
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // Make a second call, should use cached result, aggregate the cost.
   EXPECT_OK(aggregator_->Quota(request1_, &response));
@@ -747,7 +755,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForAggregated) {
             QuotaOperation_QuotaMode::QuotaOperation_QuotaMode_BEST_EFFORT);
 
   // Set response as positive.
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response2_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response2_));
 
   // Next call should be positive
   EXPECT_OK(aggregator_->Quota(request1_, &response));
@@ -767,7 +775,7 @@ TEST_F(QuotaAggregatorImplTest, TestCacheRefreshQuotaCallForNonAggregated) {
   EXPECT_TRUE(MessageDifferencer::Equals(response, empty_response_));
 
   // cache negative response
-  EXPECT_OK(aggregator_->CacheResponse(request1_, pass_response1_));
+  EXPECT_OK(aggregator_->CacheResponse(request_signature1_, pass_response1_));
 
   // After the first refresh.
   std::this_thread::sleep_for(std::chrono::milliseconds(kFlushIntervalMs + 10));
